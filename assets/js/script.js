@@ -30,10 +30,10 @@ $(document).ready(function() {
 
   function init() {
     search();
-    $('#current-forecast').hide();
-    $('#five-day-forecast-container').hide();
-    $('#search-history-container').hide();
-    $('#error-div').hide();
+    $('#now-weather').hide();
+    $('#couple-day-weather-container').hide();
+    $('#search-bar-container').hide();
+    $('#err-block').hide();
     displayHistory();
     clearHistory();
     clickHistory();
@@ -50,29 +50,30 @@ $(document).ready(function() {
         return;
       }
       $('#search-input').val('');
-      getWeather(citySearch);
+      getCityWeather(citySearch);
     });
   }
 // fetch current day weather data by city
-  function getWeather(search) {
+  function getCityWeather(searchValue) {
+
 	 // format the weather dashboard api url
-    let queryURL = apiUrl_currentDay + 'q=' + search + metric + apiKey;
+    let queryURL = apiUrl_currentDay + 'q=' + searchValue + metric + apiKey;
     $.ajax({
       url: queryURL,
       method: 'GET',
       statusCode: {
         404: function() {
-          $('#current-forecast').hide();
-          $('#five-day-forecast-container').hide();
-          $('#error-div').show();
+          $('#now-weather').hide();
+          $('#couple-day-weather-container').hide();
+          $('#err-block').show();
         }
       }
 	  // make a request to the url
 	  // request was successful
     }).then(function(response) {
-      $('#error-div').hide();
-      $('#current-forecast').show();
-      $('#five-day-forecast-container').show();
+      $('#err-block').hide();
+      $('#now-weather').show();
+      $('#couple-day-weather-container').show();
 
 	       /* Resource: 
         https://www.epa.gov/sunsafety/uv-index-scale-0
@@ -88,104 +89,108 @@ $(document).ready(function() {
       const weatherIconURL = weathericonUrl + weatherIcon + '.png';
 
      // store the search items in local storage
-      storeHistory(name);
+      saveHistory(name);
       $('#city-name').text(name + ' (' + date + ') ');
       $('#weather-image').attr('src', weatherIconURL);
       $('#temperature').html('<b>Temperature: </b>' + temperature + ' °C');
       $('#humidity').html('<b>Humidity: </b>' + humidity + '%');
       $('#wind-speed').html('<b>Wind Speed: </b>' + windSpeed + ' M/S');
 
-      const housLand = response.coord.housLand;
-      const denvBon = response.coord.denvBon;
-      const uviURL = uvUrl + housLand + '&lon=' + denvBon+ apiKey;
- // Display current UV index
+    // getting lat and lon from response 
+      const lat = response.coord.lat;
+      const lon  = response.coord.lon;
+      const uviURL = uvUrl + lat + '&lon=' + lon + apiKey;
+    // Display current UV index
       $.ajax({
         url: uviURL,
         method: 'GET'
       }).then(function(uviResponse) {
-        let uviResults = uviResponse;
-        let uvi = uviResults.value;
+        const uviResults = uviResponse;
+        const uvi = uviResults.value;
+        console.log('>>>>>>>', uvi)
         $('#uv-index').html(
           '<b>UV Index: </b>' +
-            '<span class="badge badge-pill badge-light" id="uvi-badge">' +
+            '<span class="badge badge-pill badge-light" id="uvi-displayer">' +
             uvi +
             '</span>'
         );
 
         // Select the collor for diffrent UV Alert
         if (uvi < 3) {
-          $('#uvi-badge').css('background-color', 'green');
+          $('#uvi-displayer').css('background-color', 'green');
         } else if (uvi < 6) {
-          $('#uvi-badge').css('background-color', 'yellow');
+          $('#uvi-displayer').css('background-color', 'yellow');
         } else if (uvi < 8) {
-          $('#uvi-badge').css('background-color', 'orange');
+          $('#uvi-displayer').css('background-color', 'orange');
         } else if (uvi < 11) {
-          $('#uvi-badge').css('background-color', 'red');
+          $('#uvi-displayer').css('background-color', 'red');
         } else {
-          $('#uvi-badge').css('background-color', 'purple');
+          $('#uvi-displayer').css('background-color', 'purple');
         }
-      });
+      }).catch(e => console.log(e))
 
       const cityName = name;
       const countryCode = response.sys.country;
-      const dailyUrlQuely =
+      const weatherUrlQuery =
 	 apiUrl_forecast + cityName + ',' + countryCode + metric + apiKey;
 
       $.ajax({
-        url: dailyUrlQuely ,
+        url: weatherUrlQuery ,
         method: 'GET'
       }).then(function(forecastResponse) {
-        const dailyResult = forecastResponse;
-        const dailyArr  = [];
+        const weatherResults = forecastResponse;
+        const weatherArr  = [];
 
 
        // Display 5-Day Weather Forecast on the page
         for (let i = 5; i < 40; i += 8) {
-          let dailyForcast = {};
-          let dailyDateResult = dailyResult.list[i].dt_txt;
-          let forecastDate = new Date(dailyDateResult).toLocaleDateString(
+          let weatherObj = {};
+          let weatherResultDate = weatherResults.list[i].dt_txt;
+          let weatherDate = new Date(weatherResultDate).toLocaleDateString(
             'en-US'
           );
-          let dailyTemp = dailyResult.list[i].main.temp;
-          let dailyHumidity = dailyResult.list[i].main.humidity;
-          let dailyIcon = dailyResult.list[i].weather[0].icon;
+          let weatherTemp = weatherResults.list[i].main.temp;
+          let weatherHumidity = weatherResults.list[i].main.humidity;
+          let weatherIcon = weatherResults.list[i].weather[0].icon;
 
-          dailyForcast['list'] = {};
-          dailyForcast['list']['date'] = forecastDate;
-          dailyForcast['list']['temp'] = dailyTemp;
-          dailyForcast['list']['humidity'] = dailyHumidity;
-          dailyForcast['list']['icon'] = dailyIcon;
+          weatherObj['list'] = {};
+          weatherObj['list']['date'] = weatherDate;
+          weatherObj['list']['temp'] = weatherTemp;
+          weatherObj['list']['humidity'] = weatherHumidity;
+          weatherObj['list']['icon'] = weatherIcon;
 
-          dailyArr.push(dailyForcast);
+          weatherArr.push(weatherObj);
         }
 
         for (let i = 0; i < 5; i++) {
-          let dailyDateArr = dailyArr[i].list.date;
-          let dailyUrlIcon =
-		  weathericonUrl + dailyArr[i].list.icon + '.png';
-          let dailyTempArr = Math.floor(dailyArr[i].list.temp);
-          let dailyHumidityArr = dailyArr[i].list.humidity;
+          const weatherArrDate = weatherArr[i].list.date;
+          const weatherUrlIcon =
+		  weathericonUrl + weatherArr[i].list.icon + '.png';
+          const weatherArrTemp = Math.floor(weatherArr[i].list.temp);
+          const weatherArrHumudity = weatherArr[i].list.humidity;
 
-          $('#date-' + (i + 1)).text(dailyDateArr);
-          $('#weather-image-' + (i + 1)).attr('src', dailyUrlIcon);
+          $('#date-' + (i + 1)).text(weatherArrDate);
+          $('#weather-image-' + (i + 1)).attr('src', weatherUrlIcon);
           $('#temp-' + (i + 1)).text(
-            'Temp: ' + Math.floor(dailyTempArr) + ' °C'
+            'Temp: ' + Math.floor(weatherArrTemp) + ' °C'
           );
           $('#humidity-' + (i + 1)).text(
-            'Humidity: ' + dailyHumidityArr + '%'
+            'Humidity: ' + weatherArrHumudity + '%'
           );
         }
         $('#weather-container').show();
       });
-    });
+    })
+    .catch(e => console.log(e))
+    ;
   }
   // store the search items in local storage
-  function storeHistory(citySearchName) {
-    const localHistory = {};
+  function saveHistory(citySearchName) {
+    const historySearchObj = {};
 
     if (arrHistorySearch.length === 0) {
-		localHistory['city'] = citySearchName;
-      arrHistorySearch.push(localHistory);
+		historySearchObj['city'] = citySearchName;
+      arrHistorySearch.push(historySearchObj);
       localStorage.setItem('searchHistory', JSON.stringify(arrHistorySearch));
     } else {
       let checkHistory = arrHistorySearch.find(
@@ -194,8 +199,8 @@ $(document).ready(function() {
 
       if (arrHistorySearch.length < 5) {
         if (checkHistory === undefined) {
-			localHistory['city'] = citySearchName;
-          arrHistorySearch.push(localHistory);
+			historySearchObj['city'] = citySearchName;
+          arrHistorySearch.push(historySearchObj);
           localStorage.setItem(
             'searchHistory',
             JSON.stringify(arrHistorySearch)
@@ -204,8 +209,8 @@ $(document).ready(function() {
       } else {
         if (checkHistory === undefined) {
 			arrHistorySearch.shift();
-			localHistory['city'] = citySearchName;
-          arrHistorySearch.push(localHistory);
+			historySearchObj['city'] = citySearchName;
+          arrHistorySearch.push(historySearchObj);
           localStorage.setItem(
             'searchHistory',
             JSON.stringify(arrHistorySearch)
@@ -232,7 +237,7 @@ $(document).ready(function() {
       historyLi.addClass('list-group-item');
       historyLi.text(engineResult[i].city);
       $('#search-history').prepend(historyLi);
-      $('#search-history-container').show();
+      $('#search-bar-container').show();
     }
     return (arrHistorySearch = engineResult);
   }
@@ -245,7 +250,7 @@ $(document).ready(function() {
   function clearHistory() {
     $('#clear-button').on('click', function() {
       $('#search-history').empty();
-      $('#search-history-container').hide();
+      $('#search-bar-container').hide();
       localStorage.removeItem('searchHistory');
       createHistory();
     });
@@ -254,7 +259,7 @@ $(document).ready(function() {
   function clickHistory() {
     $('#search-history').on('click', 'li', function() {
       var cityNameHistory = $(this).text();
-      getWeather(cityNameHistory);
+      getCityWeather(cityNameHistory);
     });
   }
 });
